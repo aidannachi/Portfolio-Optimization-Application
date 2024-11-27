@@ -9,6 +9,22 @@ import datetime as dt
 import yfinance as yf
 
 
+def tickerSymbols():
+    """ Return a list of all the ticker symbols listed on Yahoo Finance. """
+
+    # URL for the list of S&P 500 companies on Wikipedia
+    url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+
+    # Read the table directly from the Wikipedia page
+    tables = pd.read_html(url)
+
+    # The first table contains the tickers
+    tickers_df = tables[0]
+    tickers = tickers_df['Symbol'].tolist()  # Get the tickers
+
+    return tickers
+
+
 def fetchData(tickers):
     """
     Fetch closing prices for a list of stock tickers within a specified date range,
@@ -30,13 +46,14 @@ def fetchData(tickers):
     stockData = yf.download(tickers, start=startDate, end=endDate)['Close']
 
     # Calculate daily percentage returns
-    returns = stockData.pct_change()
+    returns = stockData.pct_change().dropna()
 
-    # Compute mean returns and covariance matrix
+    # Compute mean returns for each asset and construct a covariance matrix
     meanReturns = returns.mean()
     covMatrix = returns.cov()
 
     return meanReturns, covMatrix
+
 
 def portfolioPerformance(tickers):
     """
@@ -59,22 +76,6 @@ def portfolioPerformance(tickers):
     # Calculate the portfolio return and std as a percentage rounded to 2 decimal place.
     returns = round( (np.sum(meanReturns * weights) * 252) * 100, 2)
     std = round( (np.sqrt(np.dot(weights.T, np.dot(covMatrix, weights))) * np.sqrt(252)) * 100, 2)
-    
+
     return returns, std
-
-def tickerSymbols():
-    """ Return a list of all the ticker symbols listed on Yahoo Finance. """
-
-    # URL for the list of S&P 500 companies on Wikipedia
-    url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-
-    # Read the table directly from the Wikipedia page
-    tables = pd.read_html(url)
-
-    # The first table contains the tickers
-    tickers_df = tables[0]
-    tickers = tickers_df['Symbol'].tolist()  # Get the tickers
-
-    return tickers
-
-
+    
