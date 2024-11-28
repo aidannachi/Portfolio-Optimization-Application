@@ -55,23 +55,20 @@ def fetchData(tickers):
     return meanReturns, covMatrix
 
 
-def portfolioPerformance(tickers):
+def portfolioPerformance(weights, meanReturns, covMatrix):
     """
-    Calculate the annualized return and standard deviation (risk) of a portfolio.
+    Computes the annualized return and standard deviation (risk) of a portfolio.
 
     Parameters:
-    - tickers (list): List of stock ticker symbols representing the portfolio's assets.
+    - weights (numpy.ndarray): Array of portfolio weights for each asset. The sum of weights should be 1.
+    - meanReturns (numpy.ndarray): Array of expected daily returns for each asset.
+    - covMatrix (numpy.ndarray): Covariance matrix of daily returns for the assets.
 
     Returns:
-    - returns (float): Annualized portfolio return as a percentage.
-    - std (float): Annualized portfolio standard deviation (risk) as a percentage.
+    - tuple:
+        - returns (float): Annualized portfolio return as a percentage, rounded to two decimal places.
+        - std (float): Annualized portfolio standard deviation (risk) as a percentage, rounded to two decimal places.
     """
-
-    # Set all weights equally (1/n for n assets).
-    weights = np.array([(1 / len(tickers))] * len(tickers))
-
-    # Get the mean and covariance matrix for the portfolio
-    meanReturns, covMatrix = fetchData(tickers)
 
     # Calculate the portfolio return and std as a percentage rounded to 2 decimal place.
     returns = round( (np.sum(meanReturns * weights) * 252) * 100, 2)
