@@ -1,11 +1,11 @@
-
 # Import libraries
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.optimize as sc
-from data_processing import portfolioPerformance, fetchData
+from data_processing import portfolioPerformance
+
 
 def negativeSharpe(weights, meanReturns, covMatrix, riskFreeRate=0):
     """
@@ -53,7 +53,6 @@ def maxSharpe(meanReturns, covMatrix, riskFreeRate = 0, constraintSet=(0,1)):
         - Additional information about the optimization process, such as success status.
     """
 
-    # ...
     numAssets = len(meanReturns)
     args = (meanReturns, covMatrix, riskFreeRate)
     constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
@@ -97,6 +96,8 @@ def minimizePortfolioStd(meanReturns, covMatrix, constraintSet=(0,1)):
 
     result = sc.minimize(portfolioStd, numAssets*[1./numAssets], args=args,
                           method='SLSQP', bounds=bounds, constraints=constraints)
+    
+    return result
 
 
 def portfolioReturns(weights, meanReturns, covMatrix):
@@ -142,48 +143,48 @@ def efficientOptimization(meanReturns, covMatrix, returnTarget, constraintSet=(0
 
 def calculatedResults(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0, 1)):
     """
-    Calculate portfolio metrics and the efficient frontier for a given set of assets.
+    Compute key portfolio metrics and the efficient frontier for a given set of assets.
 
-    This function computes:
+    This function determines:
     - The portfolio with the maximum Sharpe Ratio (highest risk-adjusted return).
     - The portfolio with the minimum volatility (lowest risk).
-    - The efficient frontier, which shows the minimum variance portfolio for a range of target returns.
+    - The efficient frontier, representing the portfolio with the minimum variance 
+      for a series of target returns.
 
     Parameters:
-    - meanReturns (pandas.Series): Expected returns for each asset in the portfolio.
-    - covMatrix (numpy.ndarray): Covariance matrix of asset returns.
-    - riskFreeRate (float, optional): The risk-free rate (annualized) used in Sharpe Ratio calculations. Default is 0.
-    - constraintSet (tuple, optional): Bounds for the portfolio weights. Default is (0, 1), 
-      meaning weights are constrained between 0 and 1 (no short selling).
+    - meanReturns (pandas.Series): Expected annualized returns for each asset in the portfolio.
+    - covMatrix (numpy.ndarray): Covariance matrix of the asset returns.
+    - riskFreeRate (float, optional): Annualized risk-free rate for Sharpe Ratio calculations. Default is 0.
+    - constraintSet (tuple, optional): Bounds for portfolio weights. Default is (0, 1), 
+      meaning weights are constrained to a range of 0 to 1 (no short selling).
 
     Returns:
-    - tuple: Contains the following outputs:
+    - tuple: Contains the following results:
         - maxSR_returns (float): Annualized return (%) of the maximum Sharpe Ratio portfolio.
         - maxSR_std (float): Annualized standard deviation (%) of the maximum Sharpe Ratio portfolio.
-        - maxSR_allocation (pandas.DataFrame): Asset allocations (%) in the maximum Sharpe Ratio portfolio.
+        - maxSR_allocation (pandas.DataFrame): Asset allocations (%) for the maximum Sharpe Ratio portfolio.
         - minVol_returns (float): Annualized return (%) of the minimum volatility portfolio.
         - minVol_std (float): Annualized standard deviation (%) of the minimum volatility portfolio.
-        - minVol_allocation (pandas.DataFrame): Asset allocations (%) in the minimum volatility portfolio.
-        - efficientList (list): List of portfolio standard deviations (volatilities) along the efficient frontier.
+        - minVol_allocation (pandas.DataFrame): Asset allocations (%) for the minimum volatility portfolio.
+        - efficientList (list): Portfolio volatilities (standard deviations) along the efficient frontier.
+        - targetReturns (numpy.ndarray): Target returns used to compute the efficient frontier.
 
     Notes:
-    - The efficient frontier is calculated using 20 evenly spaced target returns between the minimum 
-      volatility portfolio return and the maximum Sharpe Ratio portfolio return.
-    - Allocations for the maximum Sharpe Ratio and minimum volatility portfolios are rounded and expressed as percentages.
-    - This function assumes the covariance matrix and mean returns are pre-calculated based on historical data or simulations.
+    - The efficient frontier is calculated using 20 evenly spaced target returns 
+      between the returns of the minimum volatility portfolio and the maximum Sharpe Ratio portfolio.
+    - Asset allocations for the maximum Sharpe Ratio and minimum volatility portfolios are expressed as percentages and rounded for clarity.
+    - The function assumes that mean returns and the covariance matrix are derived from historical data or simulated values.
     """
 
     # Max Sharpe Ratio Portfolio
     maxSR_Portfolio = maxSharpe(meanReturns, covMatrix)
     maxSR_returns, maxSR_std = portfolioPerformance(maxSR_Portfolio['x'], meanReturns, covMatrix)
-    maxSR_returns, maxSR_std = round(maxSR_returns*100,2), round(maxSR_std*100,2)
     maxSR_allocation = pd.DataFrame(maxSR_Portfolio['x'], index=meanReturns.index, columns=['allocation'])
     maxSR_allocation.allocation = [round(i*100,0) for i in maxSR_allocation.allocation]
     
     # Min Volatility Portfolio
     minVol_Portfolio = minimizePortfolioStd(meanReturns, covMatrix)
     minVol_returns, minVol_std = portfolioPerformance(minVol_Portfolio['x'], meanReturns, covMatrix)
-    minVol_returns, minVol_std = round(minVol_returns*100,2), round(minVol_std*100,2)
     minVol_allocation = pd.DataFrame(minVol_Portfolio['x'], index=meanReturns.index, columns=['allocation'])
     minVol_allocation.allocation = [round(i*100,0) for i in minVol_allocation.allocation]
 
@@ -192,54 +193,66 @@ def calculatedResults(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0, 
     targetReturns = np.linspace(minVol_returns, maxSR_returns, 20)
     for target in targetReturns:
         efficientList.append(efficientOptimization(meanReturns, covMatrix, target)['fun'])
-    return maxSR_returns, maxSR_std, maxSR_allocation, minVol_returns, minVol_std, minVol_allocation, efficientList
+
+    # Ensure the granularity between returns and volatility
+    maxSR_returns, maxSR_std = round(maxSR_returns*100,2), round(maxSR_std*100,2)
+    minVol_returns, minVol_std = round(minVol_returns*100,2), round(minVol_std*100,2)
+
+    return maxSR_returns, maxSR_std, maxSR_allocation, minVol_returns, minVol_std, minVol_allocation, efficientList, targetReturns
 
 
-def plotEfficientFrontier(meanReturns, covMatrix, riskFreeRate=0):
-    """
-    Plot the Efficient Frontier for a given portfolio of assets.
 
-    Parameters:
-    - meanReturns (numpy.ndarray): Expected returns of assets.
-    - covMatrix (numpy.ndarray): Covariance matrix of asset returns.
-    - riskFreeRate (float, optional): Risk-free rate (annualized). Default is 0.
+def get_allocations(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0, 1)):
+    """ Get the minimum volitility and maximum sharpe ratio asset allocations and details. """
 
-    Returns:
-    - None: Displays a graph of the Efficient Frontier.
-    """
-
-    # Calculate max Sharpe and min volatility portfolios
-    maxSR_Portfolio = maxSharpe(meanReturns, covMatrix, riskFreeRate)
+    # Max Sharpe Ratio Portfolio
+    maxSR_Portfolio = maxSharpe(meanReturns, covMatrix)
     maxSR_returns, maxSR_std = portfolioPerformance(maxSR_Portfolio['x'], meanReturns, covMatrix)
-
+    maxSR_allocation = pd.DataFrame(maxSR_Portfolio['x'], index=meanReturns.index, columns=['allocation'])
+    maxSR_allocation.allocation = [round(i*100,0) for i in maxSR_allocation.allocation]
+                                   
+    # Min Volatility Portfolio
     minVol_Portfolio = minimizePortfolioStd(meanReturns, covMatrix)
     minVol_returns, minVol_std = portfolioPerformance(minVol_Portfolio['x'], meanReturns, covMatrix)
+    minVol_allocation = pd.DataFrame(minVol_Portfolio['x'], index=meanReturns.index, columns=['allocation'])
+    minVol_allocation.allocation = [round(i*100,0) for i in minVol_allocation.allocation]
 
-    # Generate Efficient Frontier
-    efficientList = []
-    targetReturns = np.linspace(minVol_returns, maxSR_returns, 100)
-    for target in targetReturns:
-        efficientList.append(efficientOptimization(meanReturns, covMatrix, target)['fun'])
+    # Turn numbers to percentages
+    maxSR_returns, maxSR_std = round(maxSR_returns*100,2), round(maxSR_std*100,2)
+    minVol_returns, minVol_std = round(minVol_returns*100,2), round(minVol_std*100,2)
+    
+    return maxSR_returns, maxSR_std, maxSR_allocation, minVol_returns, minVol_std, minVol_allocation
 
-    # Set up plot style
-    sns.set(style="whitegrid")
-    plt.figure(figsize=(10, 6))
 
-    # Plot Efficient Frontier
-    plt.plot(efficientList, targetReturns * 100, label='Efficient Frontier', color='darkblue', linewidth=2)
+def plotEfficientFrontier(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0,1)):
+    """ Return a graph plotting the min vol, max sr and efficient frontier. """
 
-    # Highlight Maximum Sharpe Ratio Portfolio
-    plt.scatter(maxSR_std * 100, maxSR_returns * 100, color='red', marker='*', s=200, label='Max Sharpe Ratio')
+    # Calculate portfolio metrics and the efficient frontier
+    maxSR_returns, maxSR_std, maxSR_allocation, \
+    minVol_returns, minVol_std, minVol_allocation, \
+    efficientList, targetReturns = calculatedResults(meanReturns, covMatrix, riskFreeRate, constraintSet)
 
-    # Highlight Minimum Volatility Portfolio
-    plt.scatter(minVol_std * 100, minVol_returns * 100, color='green', marker='o', s=150, label='Min Volatility')
+    fig, ax = plt.subplots(figsize=(10, 7))
 
-    # Add labels, title, and legend
-    plt.title('Efficient Frontier', fontsize=16)
-    plt.xlabel('Risk (Standard Deviation) %', fontsize=12)
-    plt.ylabel('Return %', fontsize=12)
-    plt.legend(loc='best', fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.7)
+    efficientList = [round(ef_std * 100, 2) for ef_std in efficientList]
+    targetReturns = [round(target * 100, 2) for target in targetReturns]
+    
+    ax.plot(efficientList, targetReturns, linestyle='--', color='blue', label='Efficient Frontier')
 
-    # Display the plot
-    plt.show()
+    # Plot the minimum volitility portfolio.
+    ax.scatter(minVol_std, minVol_returns, color='red', label='Minimum Volatility Portfolio', s=100, edgecolors='black')
+    ax.text(minVol_std + 0.005, minVol_returns, 'Min Vol', fontsize=10)
+
+    # Plot the maximum Sharpe Ratio portfolio
+    ax.scatter(maxSR_std, maxSR_returns, color='green', label='Maximum Sharpe Ratio Portfolio', s=100, edgecolors='black')
+    ax.text(maxSR_std + 0.005, maxSR_returns, 'Max SR', fontsize=10)
+
+    # Add labels, legend, and title
+    ax.set_title('Efficient Frontier', fontsize=16)
+    ax.set_xlabel('Volatility (Standard Deviation)', fontsize=12)
+    ax.set_ylabel('Expected Return', fontsize=12)
+    ax.legend(loc='best', fontsize=10)
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # Return the figure object
+    return fig

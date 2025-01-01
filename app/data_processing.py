@@ -71,8 +71,8 @@ def portfolioPerformance(weights, meanReturns, covMatrix):
     """
 
     # Calculate the portfolio return and std as a percentage rounded to 2 decimal place.
-    returns = round( (np.sum(meanReturns * weights) * 252) * 100, 2)
-    std = round( (np.sqrt(np.dot(weights.T, np.dot(covMatrix, weights))) * np.sqrt(252)) * 100, 2)
+    returns = (np.sum(meanReturns * weights) * 252) 
+    std =  (np.sqrt(np.dot(weights.T, np.dot(covMatrix, weights))) * np.sqrt(252)) 
 
     return returns, std
     
