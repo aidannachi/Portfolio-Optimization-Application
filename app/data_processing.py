@@ -16,16 +16,16 @@ def tickerSymbols():
     url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
 
     # Read the table directly from the Wikipedia page
-    tables = pd.read_html(url)
+    table = pd.read_html(url)
 
     # The first table contains the tickers
-    tickers_df = tables[0]
+    tickers_df = table[0]
     tickers = tickers_df['Symbol'].tolist()  # Get the tickers
 
     return tickers
 
 
-def fetchData(tickers):
+def fetchData(tickers, startDate, endDate):
     """
     Fetch closing prices for a list of stock tickers within a specified date range,
     and compute the mean returns and covariance matrix of the returns.
@@ -40,6 +40,7 @@ def fetchData(tickers):
 
     # Get end and start dates that go from today to a year back.
     endDate = dt.datetime.now()
+
     startDate = endDate - dt.timedelta(days=365)    
     
     # Download data for all stocks

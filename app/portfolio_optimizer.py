@@ -64,10 +64,12 @@ def maxSharpe(meanReturns, covMatrix, riskFreeRate = 0, constraintSet=(0,1)):
     
     return result
 
+
 def portfolioStd(weights, meanReturns, covMatrix):
     """ Return Portfolio Standard Deviation. """
 
     return portfolioPerformance(weights, meanReturns, covMatrix)[1]
+
 
 def minimizePortfolioStd(meanReturns, covMatrix, constraintSet=(0,1)):
     """
@@ -104,6 +106,36 @@ def portfolioReturns(weights, meanReturns, covMatrix):
     """ Return Portfolio returns. """
 
     return portfolioPerformance(weights, meanReturns, covMatrix)[0]
+
+
+def negativeReturns(weights, meanReturns):
+    """
+    Calculate the negative return of a portfolio for a given set of weights and each
+    asset's expected annualized return.
+    """
+
+    return - np.dot(weights, meanReturns)
+
+
+def maxReturn(meanReturns, constraintSet=(0,1)):
+    """
+    Optimize the portfolio for a maximum return subject to constraints.
+    """
+
+    numAssets = len(meanReturns)
+    args = (meanReturns)
+
+    # Constraints: weights sum up to 1
+    constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
+
+    # Bounds for the weights
+    bounds = tuple(constraintSet for _ in range(numAssets))
+
+    # Maximize return (minimize negative return).
+    result = sc.minimize(negativeReturns, numAssets*[1./numAssets], args=args,
+                         method='SLSQP', bounds=bounds, constraints=constraints)
+    
+    return result
 
 
 def efficientOptimization(meanReturns, covMatrix, returnTarget, constraintSet=(0,1)):
@@ -177,82 +209,104 @@ def calculatedResults(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0, 
     """
 
     # Max Sharpe Ratio Portfolio
-    maxSR_Portfolio = maxSharpe(meanReturns, covMatrix)
+    maxSR_Portfolio = maxSharpe(meanReturns, covMatrix, riskFreeRate, constraintSet)
     maxSR_returns, maxSR_std = portfolioPerformance(maxSR_Portfolio['x'], meanReturns, covMatrix)
-    maxSR_allocation = pd.DataFrame(maxSR_Portfolio['x'], index=meanReturns.index, columns=['allocation'])
-    maxSR_allocation.allocation = [round(i*100,0) for i in maxSR_allocation.allocation]
+    maxSR_allocation = pd.DataFrame(maxSR_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
+    maxSR_allocation.Allocation = [round(i*100,0) for i in maxSR_allocation.Allocation]
     
     # Min Volatility Portfolio
-    minVol_Portfolio = minimizePortfolioStd(meanReturns, covMatrix)
+    minVol_Portfolio = minimizePortfolioStd(meanReturns, covMatrix, constraintSet)
     minVol_returns, minVol_std = portfolioPerformance(minVol_Portfolio['x'], meanReturns, covMatrix)
-    minVol_allocation = pd.DataFrame(minVol_Portfolio['x'], index=meanReturns.index, columns=['allocation'])
-    minVol_allocation.allocation = [round(i*100,0) for i in minVol_allocation.allocation]
+    minVol_allocation = pd.DataFrame(minVol_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
+    minVol_allocation.Allocation = [round(i*100,0) for i in minVol_allocation.Allocation]
+
+    # Max Return Portfolio
+    maxReturn_Portfolio = maxReturn(meanReturns, constraintSet)
+    maxReturn_returns, maxReturn_std = portfolioPerformance(maxReturn_Portfolio['x'], meanReturns, covMatrix)
+    maxReturn_allocation = pd.DataFrame(maxReturn_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
+    maxReturn_allocation.Allocation = [round(i * 100, 0) for i in maxReturn_allocation.Allocation]
 
     # Efficient Frontier
     efficientList = []
-    targetReturns = np.linspace(minVol_returns, maxSR_returns, 20)
+    targetReturns = np.linspace(minVol_returns, maxReturn_returns, 200)
     for target in targetReturns:
         efficientList.append(efficientOptimization(meanReturns, covMatrix, target)['fun'])
 
-    # Ensure the granularity between returns and volatility
-    maxSR_returns, maxSR_std = round(maxSR_returns*100,2), round(maxSR_std*100,2)
-    minVol_returns, minVol_std = round(minVol_returns*100,2), round(minVol_std*100,2)
+    # Scale to real sizes
+    efficientList = [round(ef_std * 100, 2) for ef_std in efficientList]
+    targetReturns = [round(target * 100, 2) for target in targetReturns] 
 
-    return maxSR_returns, maxSR_std, maxSR_allocation, minVol_returns, minVol_std, minVol_allocation, efficientList, targetReturns
+    # Convert to percentages
+    maxSR_returns, maxSR_std = round(maxSR_returns * 100, 2), round(maxSR_std * 100, 2)
+    minVol_returns, minVol_std = round(minVol_returns * 100, 2), round(minVol_std * 100, 2)
+    maxReturn_returns, maxReturn_std = round(maxReturn_returns * 100, 2), round(maxReturn_std * 100, 2)
+
+    return (
+        maxSR_returns, maxSR_std, maxSR_allocation,
+        minVol_returns, minVol_std, minVol_allocation,
+        maxReturn_returns, maxReturn_std, maxReturn_allocation,
+        efficientList, targetReturns
+    )
 
 
-
-def get_allocations(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0, 1)):
+def get_optimized_data(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0, 1)):
     """ Get the minimum volitility and maximum sharpe ratio asset allocations and details. """
 
     # Max Sharpe Ratio Portfolio
-    maxSR_Portfolio = maxSharpe(meanReturns, covMatrix)
+    maxSR_Portfolio = maxSharpe(meanReturns, covMatrix, riskFreeRate, constraintSet)
     maxSR_returns, maxSR_std = portfolioPerformance(maxSR_Portfolio['x'], meanReturns, covMatrix)
-    maxSR_allocation = pd.DataFrame(maxSR_Portfolio['x'], index=meanReturns.index, columns=['allocation'])
-    maxSR_allocation.allocation = [round(i*100,0) for i in maxSR_allocation.allocation]
+    maxSR_allocation = pd.DataFrame(maxSR_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
+    maxSR_allocation.index.name = 'Tickers'
+    maxSR_allocation['Allocation'] = [f"{round(i*100, 2)}%" for i in maxSR_allocation['Allocation']]
                                    
     # Min Volatility Portfolio
-    minVol_Portfolio = minimizePortfolioStd(meanReturns, covMatrix)
+    minVol_Portfolio = minimizePortfolioStd(meanReturns, covMatrix, constraintSet)
     minVol_returns, minVol_std = portfolioPerformance(minVol_Portfolio['x'], meanReturns, covMatrix)
-    minVol_allocation = pd.DataFrame(minVol_Portfolio['x'], index=meanReturns.index, columns=['allocation'])
-    minVol_allocation.allocation = [round(i*100,0) for i in minVol_allocation.allocation]
+    minVol_allocation = pd.DataFrame(minVol_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
+    minVol_allocation.index.name = 'Tickers'
+    minVol_allocation['Allocation'] = [f"{round(i*100, 2)}%" for i in minVol_allocation['Allocation']]
 
     # Turn numbers to percentages
     maxSR_returns, maxSR_std = round(maxSR_returns*100,2), round(maxSR_std*100,2)
     minVol_returns, minVol_std = round(minVol_returns*100,2), round(minVol_std*100,2)
+
+    maxSharpeRatio = round(maxSR_returns / maxSR_std, 2)
+    minVolSharpe = round(minVol_returns / minVol_std, 2)
     
-    return maxSR_returns, maxSR_std, maxSR_allocation, minVol_returns, minVol_std, minVol_allocation
+    results =  maxSharpeRatio, maxSR_returns, maxSR_std, maxSR_allocation, minVolSharpe, minVol_returns, minVol_std, minVol_allocation
+
+    return results
 
 
 def plotEfficientFrontier(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0,1)):
     """ Return a graph plotting the min vol, max sr and efficient frontier. """
 
-    # Calculate portfolio metrics and the efficient frontier
+    """
+    Plot the efficient frontier from Min Vol to Max Return portfolio.
+    """
     maxSR_returns, maxSR_std, maxSR_allocation, \
     minVol_returns, minVol_std, minVol_allocation, \
+    maxReturn_returns, maxReturn_std, maxReturn_allocation, \
     efficientList, targetReturns = calculatedResults(meanReturns, covMatrix, riskFreeRate, constraintSet)
 
     fig, ax = plt.subplots(figsize=(10, 7))
 
-    efficientList = [round(ef_std * 100, 2) for ef_std in efficientList]
-    targetReturns = [round(target * 100, 2) for target in targetReturns]
-    
     ax.plot(efficientList, targetReturns, linestyle='--', color='blue', label='Efficient Frontier')
 
-    # Plot the minimum volitility portfolio.
+    # Plot Min Vol, Max SR, and Max Return portfolios
     ax.scatter(minVol_std, minVol_returns, color='red', label='Minimum Volatility Portfolio', s=100, edgecolors='black')
     ax.text(minVol_std + 0.005, minVol_returns, 'Min Vol', fontsize=10)
 
-    # Plot the maximum Sharpe Ratio portfolio
     ax.scatter(maxSR_std, maxSR_returns, color='green', label='Maximum Sharpe Ratio Portfolio', s=100, edgecolors='black')
     ax.text(maxSR_std + 0.005, maxSR_returns, 'Max SR', fontsize=10)
 
+    ax.scatter(maxReturn_std, maxReturn_returns, color='orange', label='Maximum Return Portfolio', s=100, edgecolors='black')
+    ax.text(maxReturn_std + 0.005, maxReturn_returns, 'Max Return', fontsize=10)
+
     # Add labels, legend, and title
-    ax.set_title('Efficient Frontier', fontsize=16)
     ax.set_xlabel('Volatility (Standard Deviation)', fontsize=12)
     ax.set_ylabel('Expected Return', fontsize=12)
     ax.legend(loc='best', fontsize=10)
     ax.grid(True, linestyle='--', alpha=0.6)
     
-    # Return the figure object
     return fig
