@@ -1,3 +1,8 @@
+# Portfolio Optimizer
+# 2024.12.20
+# Aidan Nachi
+
+
 # Import libraries
 import numpy as np
 import pandas as pd
@@ -212,19 +217,19 @@ def calculatedResults(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0, 
     maxSR_Portfolio = maxSharpe(meanReturns, covMatrix, riskFreeRate, constraintSet)
     maxSR_returns, maxSR_std = portfolioPerformance(maxSR_Portfolio['x'], meanReturns, covMatrix)
     maxSR_allocation = pd.DataFrame(maxSR_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
-    maxSR_allocation.Allocation = [round(i*100,0) for i in maxSR_allocation.Allocation]
+    maxSR_allocation['Allocation'] = [round(i*100,0) for i in maxSR_allocation['Allocation']]
     
     # Min Volatility Portfolio
     minVol_Portfolio = minimizePortfolioStd(meanReturns, covMatrix, constraintSet)
     minVol_returns, minVol_std = portfolioPerformance(minVol_Portfolio['x'], meanReturns, covMatrix)
     minVol_allocation = pd.DataFrame(minVol_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
-    minVol_allocation.Allocation = [round(i*100,0) for i in minVol_allocation.Allocation]
+    minVol_allocation['Allocation'] = [round(i*100,0) for i in minVol_allocation['Allocation']]
 
     # Max Return Portfolio
     maxReturn_Portfolio = maxReturn(meanReturns, constraintSet)
     maxReturn_returns, maxReturn_std = portfolioPerformance(maxReturn_Portfolio['x'], meanReturns, covMatrix)
     maxReturn_allocation = pd.DataFrame(maxReturn_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
-    maxReturn_allocation.Allocation = [round(i * 100, 0) for i in maxReturn_allocation.Allocation]
+    maxReturn_allocation['Allocation']  = [round(i * 100, 0) for i in maxReturn_allocation['Allocation']]
 
     # Efficient Frontier
     efficientList = []
@@ -266,14 +271,25 @@ def get_optimized_data(meanReturns, covMatrix, riskFreeRate=0, constraintSet=(0,
     minVol_allocation.index.name = 'Tickers'
     minVol_allocation['Allocation'] = [f"{round(i*100, 2)}%" for i in minVol_allocation['Allocation']]
 
+    # Max Return Portfolio
+    maxReturn_Portfolio = maxReturn(meanReturns, constraintSet)
+    maxReturn_returns, maxReturn_std = portfolioPerformance(maxReturn_Portfolio['x'], meanReturns, covMatrix)
+    maxReturn_allocation = pd.DataFrame(maxReturn_Portfolio['x'], index=meanReturns.index, columns=['Allocation'])
+    maxReturn_allocation['Allocation'] = [f"{round(i*100, 2)}%" for i in maxReturn_allocation['Allocation']]
+
     # Turn numbers to percentages
     maxSR_returns, maxSR_std = round(maxSR_returns*100,2), round(maxSR_std*100,2)
     minVol_returns, minVol_std = round(minVol_returns*100,2), round(minVol_std*100,2)
+    maxReturn_returns, maxReturn_std = round(maxReturn_returns*100,2), round(maxReturn_std*100,2)
 
     maxSharpeRatio = round(maxSR_returns / maxSR_std, 2)
     minVolSharpe = round(minVol_returns / minVol_std, 2)
+    maxReturnSharpe = round(maxReturn_returns / maxReturn_std, 2)
     
-    results =  maxSharpeRatio, maxSR_returns, maxSR_std, maxSR_allocation, minVolSharpe, minVol_returns, minVol_std, minVol_allocation
+    results =  (maxSharpeRatio, maxSR_returns, maxSR_std, 
+                maxSR_allocation, minVolSharpe, minVol_returns, minVol_std, 
+                minVol_allocation, maxReturnSharpe, maxReturn_returns, 
+                maxReturn_std, maxReturn_allocation)
 
     return results
 

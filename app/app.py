@@ -1,3 +1,8 @@
+# App
+# 2024.11.23
+# Aidan Nachi
+
+
 import streamlit as st
 from data_processing import fetchData, tickerSymbols, portfolioPerformance
 from portfolio_optimizer import calculatedResults, plotEfficientFrontier, get_optimized_data
@@ -40,7 +45,7 @@ with paramsCont:
     # Allow users to select the optimization objective.
     opObjCol, riskFreeRateCol = st.columns(2)
     with opObjCol:
-        optimizationObjective = st.selectbox("Optimization Objective", ["Maximize Sharpe Ratio", "Minimize Volatility"])
+        optimizationObjective = st.selectbox("Optimization Objective", ["Maximize Sharpe Ratio", "Minimize Volatility", "Maximize Return"])
     with riskFreeRateCol:
         riskFreeRate = st.number_input("Risk-Free-Rate (%)", min_value=0.0, max_value=100.0, value=0.0, format="%.2f")
         riskFreeRate /= 100
@@ -74,9 +79,10 @@ if calc:
             st.markdown(f"**Sharpe Ratio:** {equalSharpe}")
 
         # Get data for maxSR and minVol portfolios.
-        maxSharpeRatio, maxSR_returns, maxSR_std,\
-        maxSR_allocation, minVolSharpe, minVol_returns,\
-        minVol_std, minVol_allocation = get_optimized_data(meanReturns, covMatrix, riskFreeRate, constraintSet=(minAllocation, maxAllocation))
+        maxSharpeRatio, maxSR_returns, maxSR_std, \
+        maxSR_allocation, minVolSharpe, minVol_returns, minVol_std, \
+        minVol_allocation, maxReturnSharpe, maxReturn_returns, \
+        maxReturn_std, maxReturn_allocation = get_optimized_data(meanReturns, covMatrix, riskFreeRate, constraintSet=(minAllocation, maxAllocation))
 
         # Clean up tables
         maxSR_allocation["Assets"] = maxSR_allocation.index
@@ -84,6 +90,9 @@ if calc:
 
         minVol_allocation["Assets"] = minVol_allocation.index
         minVol_allocation = minVol_allocation[["Assets", "Allocation"]]
+
+        maxReturn_allocation["Assets"] = maxReturn_allocation.index
+        maxReturn_allocation = maxReturn_allocation[["Assets", "Allocation"]]
 
         st.markdown("### Optimized Portfolio Results")
 
@@ -114,8 +123,8 @@ if calc:
                     fig.update_layout(width=180, height=200, margin=dict(t=20, b=0, l=0, r=0))
                     st.plotly_chart(fig, use_container_width=True)
 
+        # Display data for min vol portfolio
         elif optimizationObjective == "Minimize Volatility":
-            # Display data for min vol portfolio
             minVolCont = st.container(border=True)
             with minVolCont:
                 st.markdown("##### Min Volitility Portfolio")
@@ -135,6 +144,34 @@ if calc:
 
                     fig = px.pie(
                         minVol_allocation_pie, 
+                        names='Assets', 
+                        values='Numeric Allocation', 
+                    )
+                    fig.update_layout(width=180, height=200, margin=dict(t=20, b=0, l=0, r=0))
+                    st.plotly_chart(fig, use_container_width=True)
+
+
+        # Display data for max return portfolio.
+        elif optimizationObjective == "Maximize Return":
+            maxReturnsCont = st.container(border=True)
+            with maxReturnsCont:
+                st.markdown("##### Max Returns Portfolio")
+                st.markdown(f"**Expected Return:** {maxReturn_returns}%")
+                st.markdown(f"**Volatility:** {maxReturn_std}%")
+                st.markdown(f"**Sharpe Ratio:** {maxReturnSharpe}")
+
+                st.markdown("##### Asset Allocation")
+                maxReturnTable, maxReturnPie = st.columns(2)
+                with maxReturnTable:
+                    ui.table(maxReturn_allocation)
+
+                with maxReturnPie:
+                    # Ensure Allocation values are numeric and non zero.
+                    maxReturn_allocation['Numeric Allocation'] = maxReturn_allocation['Allocation'].str.rstrip('%').astype(float)
+                    maxReturn_allocation_pie = maxReturn_allocation[maxReturn_allocation['Numeric Allocation'] != 0]
+
+                    fig = px.pie(
+                        maxReturn_allocation_pie, 
                         names='Assets', 
                         values='Numeric Allocation', 
                     )
