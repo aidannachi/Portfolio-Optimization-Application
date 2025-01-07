@@ -56,7 +56,7 @@ def fetchData(tickers, startDate, endDate):
     return meanReturns, covMatrix
 
 
-def portfolioPerformance(weights, meanReturns, covMatrix):
+def expectedPortfolioPerformance(weights, meanReturns, covMatrix):
     """
     Computes the annualized return and standard deviation (risk) of a portfolio.
 
@@ -72,8 +72,52 @@ def portfolioPerformance(weights, meanReturns, covMatrix):
     """
 
     # Calculate the portfolio return and std as a percentage rounded to 2 decimal place.
-    returns = (np.sum(meanReturns * weights) * 252) 
+    expectedReturns = (np.sum(meanReturns * weights) * 252) 
     std =  (np.sqrt(np.dot(weights.T, np.dot(covMatrix, weights))) * np.sqrt(252)) 
 
-    return returns, std
+    return expectedReturns, std
     
+def assetCorrelations(tickers, startDate, endDate):
+    """ Return a correlation matrix for the assets. """
+
+    # Get the adjusted closing prices for each ticker.
+    asset_data = yf.download(tickers, start=startDate, end=endDate)
+    adj_close = asset_data['Adj Close']
+
+    # Calculate the daily returns for each asset and use them to build a correlation matrix.
+    daily_returns = adj_close.pct_change().dropna()
+    correlation_matrix = daily_returns.corr()
+
+    return correlation_matrix
+
+
+
+# def actualPortfolioPerformance(weights, asset_returns):
+#     """
+#     Computes the performance of a portfolio over a period of time.
+#     """
+
+#     portfolio_return = np.sum(asset_returns * weights)
+#     return portfolio_return
+
+# def checkDate(assets, date):
+#     """ Check if there is data for selected assets on a certain date. """
+
+#     for asset in assets:
+
+
+
+# def getAssetReturns(assets, startDate, endDate):
+#     """ Get the start and end prices for assets. """
+
+#     # Get data from inception to end date and handle missing values by filling forward.
+#     asset_data = yf.download(assets, end=endDate)
+#     asset_data = asset_data.ffill()
+
+#     print(asset_data)
+
+#     start_prices = 
+#     end_prices = 
+
+
+

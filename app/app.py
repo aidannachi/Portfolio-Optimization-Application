@@ -4,8 +4,8 @@
 
 
 import streamlit as st
-from data_processing import fetchData, tickerSymbols, portfolioPerformance
-from portfolio_optimizer import calculatedResults, plotEfficientFrontier, get_optimized_data
+from data_processing import fetchData, tickerSymbols, expectedPortfolioPerformance, assetCorrelations
+from portfolio_optimizer import plotEfficientFrontier, get_optimized_data
 import datetime as dt 
 import numpy as np
 import plotly.express as px
@@ -25,7 +25,7 @@ with paramsCont:
     # Allow user to select the timeframe.
     dateCol1, dateCol2 = st.columns(2)
     with dateCol1:
-        startDate = st.date_input("Start Date", dt.date.today() - dt.timedelta(days=365))
+        startDate = st.date_input("Start Date", dt.date.today() - dt.timedelta(days=366))
     with dateCol2:
         endDate = st.date_input("End Date", dt.date.today())
 
@@ -63,11 +63,29 @@ if calc:
 
         # Grab data for selected assets
         meanReturns, covMatrix = fetchData(tickers, startDate, endDate)
+        #start_prices, end_prices, asset_returns = getAssetReturns(tickers, startDate, endDate)
+
+        # # Clean up table.
+        # asset_returns = asset_returns.reset_index()
+        # asset_returns.columns = ["Assets", "Returns"]
+
+        # selectedAssetCont = st.container(border=True)
+        # with selectedAssetCont:
+        #     st.markdown("##### Selected Asset Individual Performance")
+        #     ui.table(asset_returns)
+        corrMatrix = assetCorrelations(tickers, startDate, endDate)
+        corrMatrixCont = st.container(border=True)
+        with corrMatrixCont:
+            st.markdown("##### Asset Correlations")
+            st.dataframe(corrMatrix, use_container_width=True)
+            st.markdown(
+                f"<p style='font-size:15px; color: #A9A9A9;'>Based on daily returns from {startDate} to {endDate}</p>", 
+                unsafe_allow_html=True)
 
         # Get data for equally weighted portfolio.
         num_tickers = len(tickers)
         weights = np.array([1/num_tickers] * num_tickers)
-        returns, std = portfolioPerformance(weights, meanReturns, covMatrix)
+        returns, std = expectedPortfolioPerformance(weights, meanReturns, covMatrix)
         equalSharpe = round(returns / std, 2)
 
         # Display data for equally weighted portfolio
