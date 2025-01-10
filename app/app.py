@@ -4,23 +4,39 @@
 
 
 import streamlit as st
-from data_processing import fetchData, tickerSymbols, expectedPortfolioPerformance, assetCorrelations
-from portfolio_optimizer import plotEfficientFrontier, get_optimized_data
+from data_processing import dataProcessing
+from portfolio_optimizer import PortfolioOptimization
 import datetime as dt 
 import numpy as np
 import plotly.express as px
 import streamlit_shadcn_ui as ui
 
 
+
 # Application Title
-st.markdown("<h1 style='text-align: center;'>Portfolio Optimization</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>Portfolio Optimization</h1>", unsafe_allow_html=True)\
+
+# Author and linkedin
+authorCol1, authorCol2 = st.columns([0.14, 0.86], gap="small")
+authorCol1.write("`Created by:`")
+linkedin_url = "https://www.linkedin.com/in/aidannachi/"
+authorCol2.markdown(
+    f'<a href="{linkedin_url}" target="_blank" style="text-decoration: none; color: inherit;">'
+    f'<img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" width="15" height="15" style="vertical-align: middle; margin-right: 10px;">'
+    f'Aidan Nachi</a>',
+    unsafe_allow_html=True
+)
 
 # User input section.
 paramsCont = st.container(border=True)
 with paramsCont:
-    
+    st.markdown("### Portfolio Optimization Configurations")
+
+    # Instantialize data processing class.
+    dp = dataProcessing
+
     # Allow users to select tickers.
-    tickers = st.multiselect('Select assets for your portfolio', tickerSymbols(), default=['AAPL', 'MSFT', 'TSLA'])
+    tickers = st.multiselect('Select assets for your portfolio', dp.tickerSymbols(), default=['AAPL', 'MSFT', 'TSLA'])
 
     # Allow user to select the timeframe.
     dateCol1, dateCol2 = st.columns(2)
@@ -62,18 +78,20 @@ if calc:
         st.markdown("### Portfolio Results")
 
         # Grab data for selected assets
-        meanReturns, covMatrix = fetchData(tickers, startDate, endDate)
-        #start_prices, end_prices, asset_returns = getAssetReturns(tickers, startDate, endDate)
+        assetReturnVol, meanReturns, covMatrix = dp.fetchData(tickers, startDate, endDate)
 
-        # # Clean up table.
-        # asset_returns = asset_returns.reset_index()
-        # asset_returns.columns = ["Assets", "Returns"]
+        # Instantialize the portfolio optimizer class.
+        po = PortfolioOptimization(optimizationObjective, meanReturns, covMatrix, riskFreeRate, constraintSet=(minAllocation, maxAllocation))
+        
+        assetRetVolCont = st.container(border=True)
+        with assetRetVolCont:
+            st.markdown("##### Asset Summary")
+            ui.table(assetReturnVol)
+            st.markdown(
+                f"<p style='font-size:15px; color: #A9A9A9;'>Results based on historical returns. Expected return is the annualized daily arithmetic mean return.</p>", 
+                unsafe_allow_html=True)
 
-        # selectedAssetCont = st.container(border=True)
-        # with selectedAssetCont:
-        #     st.markdown("##### Selected Asset Individual Performance")
-        #     ui.table(asset_returns)
-        corrMatrix = assetCorrelations(tickers, startDate, endDate)
+        corrMatrix = dp.assetCorrelations(tickers, startDate, endDate)
         corrMatrixCont = st.container(border=True)
         with corrMatrixCont:
             st.markdown("##### Asset Correlations")
@@ -85,7 +103,7 @@ if calc:
         # Get data for equally weighted portfolio.
         num_tickers = len(tickers)
         weights = np.array([1/num_tickers] * num_tickers)
-        returns, std = expectedPortfolioPerformance(weights, meanReturns, covMatrix)
+        returns, std = dp.expectedPortfolioPerformance(weights, meanReturns, covMatrix)
         equalSharpe = round(returns / std, 2)
 
         # Display data for equally weighted portfolio
@@ -100,22 +118,17 @@ if calc:
         maxSharpeRatio, maxSR_returns, maxSR_std, \
         maxSR_allocation, minVolSharpe, minVol_returns, minVol_std, \
         minVol_allocation, maxReturnSharpe, maxReturn_returns, \
-        maxReturn_std, maxReturn_allocation = get_optimized_data(meanReturns, covMatrix, riskFreeRate, constraintSet=(minAllocation, maxAllocation))
-
-        # Clean up tables
-        maxSR_allocation["Assets"] = maxSR_allocation.index
-        maxSR_allocation = maxSR_allocation[["Assets", "Allocation"]]
-
-        minVol_allocation["Assets"] = minVol_allocation.index
-        minVol_allocation = minVol_allocation[["Assets", "Allocation"]]
-
-        maxReturn_allocation["Assets"] = maxReturn_allocation.index
-        maxReturn_allocation = maxReturn_allocation[["Assets", "Allocation"]]
+        maxReturn_std, maxReturn_allocation = po.get_optimized_data()
 
         st.markdown("### Optimized Portfolio Results")
 
         # Display data for max sharpe portfolio
         if optimizationObjective == "Maximize Sharpe Ratio":
+            
+            # Clean up tables
+            maxSR_allocation["Assets"] = maxSR_allocation.index
+            maxSR_allocation = maxSR_allocation[["Assets", "Allocation"]]
+
             maxSharpeCont = st.container(border=True)
             with maxSharpeCont:
                 st.markdown("##### Max Sharpe Ratio Portfolio")
@@ -143,6 +156,11 @@ if calc:
 
         # Display data for min vol portfolio
         elif optimizationObjective == "Minimize Volatility":
+
+            # Clean up tables
+            minVol_allocation["Assets"] = minVol_allocation.index
+            minVol_allocation = minVol_allocation[["Assets", "Allocation"]]
+
             minVolCont = st.container(border=True)
             with minVolCont:
                 st.markdown("##### Min Volitility Portfolio")
@@ -171,6 +189,11 @@ if calc:
 
         # Display data for max return portfolio.
         elif optimizationObjective == "Maximize Return":
+
+            # Clean up tables
+            maxReturn_allocation["Assets"] = maxReturn_allocation.index
+            maxReturn_allocation = maxReturn_allocation[["Assets", "Allocation"]]
+
             maxReturnsCont = st.container(border=True)
             with maxReturnsCont:
                 st.markdown("##### Max Returns Portfolio")
@@ -198,14 +221,14 @@ if calc:
 
                 
         # Draw Efficient Frontier with minVol and maxSharpe
-        graph = plotEfficientFrontier(meanReturns, covMatrix)
+        graph = po.plotEfficientFrontier()
 
         graphCont = st.container(border=True)
         with graphCont:
             st.markdown("#### Efficient Frontier")
             st.pyplot(graph)
 
-        
+                
 
 else:
     st.markdown(

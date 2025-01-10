@@ -8,116 +8,131 @@ import pandas as pd
 import datetime as dt
 import yfinance as yf
 
-
-def tickerSymbols():
-    """ Return a list of all the ticker symbols listed on Yahoo Finance. """
-
-    # URL for the list of S&P 500 companies on Wikipedia
-    url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-
-    # Read the table directly from the Wikipedia page
-    table = pd.read_html(url)
-
-    # The first table contains the tickers
-    tickers_df = table[0]
-    tickers = tickers_df['Symbol'].tolist()  # Get the tickers
-
-    return tickers
+class dataProcessing:
+    def __init__():
+        """
+        Initialize the dataProcessing class. No specific initialization needed.
+        """
+        pass
 
 
-def fetchData(tickers, startDate, endDate):
-    """
-    Fetch closing prices for a list of stock tickers within a specified date range,
-    and compute the mean returns and covariance matrix of the returns.
+    @staticmethod
+    def tickerSymbols():
+        """ Return a list of all the ticker symbols listed on Yahoo Finance. """
 
-    Parameters:
-    - tickers (list): List of tickers symbols.
+        # URL for the list of S&P 500 companies on Wikipedia
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
 
-    Returns:
-    - meanReturns (pd.Series): Mean daily returns for each stock.
-    - covMatrix (pd.DataFrame): Covariance matrix of the returns.
-    """
+        # Read the table directly from the Wikipedia page
+        table = pd.read_html(url)
 
-    # Get end and start dates that go from today to a year back.
-    endDate = dt.datetime.now()
+        # The first table contains the tickers
+        tickers_df = table[0]
+        tickers = tickers_df['Symbol'].tolist()  # Get the tickers
 
-    startDate = endDate - dt.timedelta(days=365)    
+        return tickers
+
     
-    # Download data for all stocks
-    stockData = yf.download(tickers, start=startDate, end=endDate)['Close']
+    @staticmethod
+    def fetchData(tickers, startDate, endDate):
+        """
+        Fetch closing prices for a list of stock tickers within a specified date range,
+        and compute the mean returns and covariance matrix of the returns.
 
-    # Calculate daily percentage returns
-    returns = stockData.pct_change().dropna()
+        Parameters:
+        - tickers (list): List of tickers symbols.
+        - startDate (str or None): Start date for data fetching (YYYY-MM-DD format or None for default).
+        - endDate (str or None): End date for data fetching (YYYY-MM-DD format or None for default).
 
-    # Compute mean returns for each asset and construct a covariance matrix
-    meanReturns = returns.mean()
-    covMatrix = returns.cov()
+        Returns:
+        - meanReturns (pd.Series): Mean daily returns for each stock.
+        - covMatrix (pd.DataFrame): Covariance matrix of the returns.
+        """
+   
+        # Download data for all stocks
+        stockData = yf.download(tickers, start=startDate, end=endDate)['Adj Close']
 
-    return meanReturns, covMatrix
+        # Calculate daily percentage returns
+        daily_returns = stockData.pct_change().dropna()
 
+        # Get annual volitility and returns.
+        annual_returns = daily_returns.mean() * 252 
+        annual_volatility = daily_returns.std() * np.sqrt(252)
 
-def expectedPortfolioPerformance(weights, meanReturns, covMatrix):
-    """
-    Computes the annualized return and standard deviation (risk) of a portfolio.
+        annual_returns = round(annual_returns * 100, 2).map("{:.2f}%".format)
+        annual_volatility = round(annual_volatility * 100, 2).map("{:.2f}%".format)
 
-    Parameters:
-    - weights (numpy.ndarray): Array of portfolio weights for each asset. The sum of weights should be 1.
-    - meanReturns (numpy.ndarray): Array of expected daily returns for each asset.
-    - covMatrix (numpy.ndarray): Covariance matrix of daily returns for the assets.
+        # Compute mean returns for each asset and construct a covariance matrix
+        meanReturns = daily_returns.mean()
+        covMatrix = daily_returns.cov()
 
-    Returns:
-    - tuple:
-        - returns (float): Annualized portfolio return as a percentage, rounded to two decimal places.
-        - std (float): Annualized portfolio standard deviation (risk) as a percentage, rounded to two decimal places.
-    """
+        # Create a DataFrame
+        assetResults = pd.DataFrame({
+            'Ticker': tickers,
+            'Expected Return': annual_returns,
+            'Volitility (Standard Deviation)': annual_volatility
+        }, index=tickers)
 
-    # Calculate the portfolio return and std as a percentage rounded to 2 decimal place.
-    expectedReturns = (np.sum(meanReturns * weights) * 252) 
-    std =  (np.sqrt(np.dot(weights.T, np.dot(covMatrix, weights))) * np.sqrt(252)) 
-
-    return expectedReturns, std
-    
-def assetCorrelations(tickers, startDate, endDate):
-    """ Return a correlation matrix for the assets. """
-
-    # Get the adjusted closing prices for each ticker.
-    asset_data = yf.download(tickers, start=startDate, end=endDate)
-    adj_close = asset_data['Adj Close']
-
-    # Calculate the daily returns for each asset and use them to build a correlation matrix.
-    daily_returns = adj_close.pct_change().dropna()
-    correlation_matrix = daily_returns.corr()
-
-    return correlation_matrix
+        return assetResults, meanReturns, covMatrix
 
 
+    @staticmethod
+    def expectedPortfolioPerformance(weights, meanReturns, covMatrix):
+        """
+        Computes the annualized return and standard deviation (risk) of a portfolio.
 
-# def actualPortfolioPerformance(weights, asset_returns):
-#     """
-#     Computes the performance of a portfolio over a period of time.
-#     """
+        Parameters:
+        - weights (numpy.ndarray): Array of portfolio weights for each asset. The sum of weights should be 1.
+        - meanReturns (numpy.ndarray): Array of expected daily returns for each asset.
+        - covMatrix (numpy.ndarray): Covariance matrix of daily returns for the assets.
 
-#     portfolio_return = np.sum(asset_returns * weights)
-#     return portfolio_return
+        Returns:
+        - tuple:
+            - returns (float): Annualized portfolio return as a percentage, rounded to two decimal places.
+            - std (float): Annualized portfolio standard deviation (risk) as a percentage, rounded to two decimal places.
+        """
 
-# def checkDate(assets, date):
-#     """ Check if there is data for selected assets on a certain date. """
+        # Calculate the portfolio return and std as a percentage rounded to 2 decimal place.
+        expectedReturns = (np.sum(meanReturns * weights) * 252) 
+        std =  (np.sqrt(np.dot(weights.T, np.dot(covMatrix, weights))) * np.sqrt(252)) 
 
-#     for asset in assets:
+        return expectedReturns, std
 
 
+    @staticmethod 
+    def assetCorrelations(tickers, startDate=None, endDate=None):
+        """
+        Return a correlation matrix for the assets.
 
-# def getAssetReturns(assets, startDate, endDate):
-#     """ Get the start and end prices for assets. """
+        Parameters:
+        - tickers (list): List of ticker symbols.
+        - startDate (str or None): Start date for data fetching (YYYY-MM-DD format or None for default).
+        - endDate (str or None): End date for data fetching (YYYY-MM-DD format or None for default).
 
-#     # Get data from inception to end date and handle missing values by filling forward.
-#     asset_data = yf.download(assets, end=endDate)
-#     asset_data = asset_data.ffill()
+        Returns:
+        - correlation_matrix (pd.DataFrame): Correlation matrix of the assets.
+        """
 
-#     print(asset_data)
+        # Set default date range if not provided
+        if not endDate:
+            endDate = dt.datetime.now()
+        else:
+            endDate = pd.to_datetime(endDate)
 
-#     start_prices = 
-#     end_prices = 
+        if not startDate:
+            startDate = endDate - dt.timedelta(days=365)
+        else:
+            startDate = pd.to_datetime(startDate)
+
+        # Get the adjusted closing prices for each ticker.
+        asset_data = yf.download(tickers, start=startDate, end=endDate)
+        adj_close = asset_data['Adj Close']
+
+        # Calculate the daily returns for each asset and use them to build a correlation matrix.
+        daily_returns = adj_close.pct_change().dropna()
+        correlation_matrix = daily_returns.corr()
+
+        return correlation_matrix
 
 
 
