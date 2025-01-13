@@ -73,7 +73,7 @@ class dataProcessing:
             'Volitility (Standard Deviation)': annual_volatility
         }, index=tickers)
 
-        return assetResults, meanReturns, covMatrix
+        return assetResults, daily_returns, meanReturns, covMatrix
 
 
     @staticmethod

@@ -6,6 +6,7 @@
 import streamlit as st
 from data_processing import dataProcessing
 from portfolio_optimizer import PortfolioOptimization
+from risk import Risk
 import datetime as dt 
 import numpy as np
 import plotly.express as px
@@ -78,7 +79,7 @@ if calc:
         st.markdown("### Portfolio Results")
 
         # Grab data for selected assets
-        assetReturnVol, meanReturns, covMatrix = dp.fetchData(tickers, startDate, endDate)
+        assetReturnVol, dailyReturns, meanReturns, covMatrix = dp.fetchData(tickers, startDate, endDate)
 
         # Instantialize the portfolio optimizer class.
         po = PortfolioOptimization(optimizationObjective, meanReturns, covMatrix, riskFreeRate, constraintSet=(minAllocation, maxAllocation))
@@ -125,6 +126,8 @@ if calc:
         # Display data for max sharpe portfolio
         if optimizationObjective == "Maximize Sharpe Ratio":
             
+            r = Risk(dailyReturns, maxSR_allocation)
+
             # Clean up tables
             maxSR_allocation["Assets"] = maxSR_allocation.index
             maxSR_allocation = maxSR_allocation[["Assets", "Allocation"]]
@@ -154,8 +157,18 @@ if calc:
                     fig.update_layout(width=180, height=200, margin=dict(t=20, b=0, l=0, r=0))
                     st.plotly_chart(fig, use_container_width=True)
 
+            # Display VaR and CVaR for portfolio.
+            riskMsCont = st.container(border=True)
+            with riskMsCont:
+                st.markdown("##### Risk Metrics")
+
+                maxSrRiskTable = r.getVarCvar()
+                ui.table(maxSrRiskTable)
+
         # Display data for min vol portfolio
         elif optimizationObjective == "Minimize Volatility":
+
+            r = Risk(dailyReturns, minVol_allocation)
 
             # Clean up tables
             minVol_allocation["Assets"] = minVol_allocation.index
@@ -186,9 +199,19 @@ if calc:
                     fig.update_layout(width=180, height=200, margin=dict(t=20, b=0, l=0, r=0))
                     st.plotly_chart(fig, use_container_width=True)
 
+            # Display VaR and CVaR for portfolio.
+            riskMVolCont = st.container(border=True)
+            with riskMVolCont:
+                st.markdown("##### Risk Metrics")
+                
+                minVolRiskTable = r.getVarCvar()
+                ui.table(minVolRiskTable)
+
 
         # Display data for max return portfolio.
         elif optimizationObjective == "Maximize Return":
+
+            r = Risk(dailyReturns, maxReturn_allocation)
 
             # Clean up tables
             maxReturn_allocation["Assets"] = maxReturn_allocation.index
@@ -218,7 +241,14 @@ if calc:
                     )
                     fig.update_layout(width=180, height=200, margin=dict(t=20, b=0, l=0, r=0))
                     st.plotly_chart(fig, use_container_width=True)
-
+            
+            # Display VaR and CVaR for portfolio.
+            riskMRolCont = st.container(border=True)
+            with riskMRolCont:
+                st.markdown("##### Risk Metrics")
+                
+                maxRetRiskTable = r.getVarCvar()
+                ui.table(maxRetRiskTable)
                 
         # Draw Efficient Frontier with minVol and maxSharpe
         graph = po.plotEfficientFrontier()

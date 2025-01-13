@@ -288,13 +288,13 @@ class PortfolioOptimization:
 
         # Get min and max returns for the efficient frontier bounds.
         minReturn_Portfolio = self.__minReturn()
-        minReturn_returns = self.dp.expectedPortfolioPerformance(minReturn_Portfolio['x'], self.meanReturns, self.covMatrix)[0]
+        minReturn_returns_list = self.dp.expectedPortfolioPerformance(minReturn_Portfolio['x'], self.meanReturns, self.covMatrix)[0]
         maxReturn_Portfolio = self.__maxReturn()
-        maxReturn_returns = self.dp.expectedPortfolioPerformance(maxReturn_Portfolio['x'], self.meanReturns, self.covMatrix)[0]
+        maxReturn_returns_list = self.dp.expectedPortfolioPerformance(maxReturn_Portfolio['x'], self.meanReturns, self.covMatrix)[0]
 
         # Efficient Frontier
         efficientList = []
-        targetReturns = np.linspace(minReturn_returns, maxReturn_returns, 100)
+        targetReturns = np.linspace(minReturn_returns_list, maxReturn_returns_list, 100)
         for target in targetReturns:
             efficientList.append(self.__efficientOptimization(target)['fun'])
 
