@@ -50,7 +50,7 @@ class dataProcessing:
         """
    
         # Download data for all stocks
-        stockData = yf.download(tickers, start=startDate, end=endDate)['Adj Close']
+        stockData = yf.download(tickers, start=startDate, end=endDate, auto_adjust=True)['Close']
 
         # Calculate daily percentage returns
         daily_returns = stockData.pct_change().dropna()
@@ -126,7 +126,7 @@ class dataProcessing:
 
         # Get the adjusted closing prices for each ticker.
         asset_data = yf.download(tickers, start=startDate, end=endDate)
-        adj_close = asset_data['Adj Close']
+        adj_close = asset_data['Close']
 
         # Calculate the daily returns for each asset and use them to build a correlation matrix.
         daily_returns = adj_close.pct_change().dropna()
